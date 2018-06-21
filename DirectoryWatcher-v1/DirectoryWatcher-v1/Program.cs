@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -12,7 +13,7 @@ namespace DirectoryWatcher_v1
 
         static void Main(string[] args)
         {
-
+            
             var watcherPath = CreateWatcherDirectory();
 
             Console.WriteLine($"Beginning to watch directory {watcherPath.FullName}");
@@ -73,12 +74,13 @@ namespace DirectoryWatcher_v1
             return Path.GetFileNameWithoutExtension(path);
         }
 
-        private static void FileCreated(object sender, FileSystemEventArgs e)
+        private static async void FileCreated(object sender, FileSystemEventArgs e)
         {
             //If file!
             if (!IsDirectory(e.FullPath))
             {
                 Console.WriteLine($"{GetExtensionlessName(e.FullPath)} has been {e.ChangeType.ToString().ToLower()}");
+                await UploadFile(e.FullPath, "anonymous", "anonymous");
             }
             else
             {
@@ -94,6 +96,22 @@ namespace DirectoryWatcher_v1
         {
             FileAttributes fa = File.GetAttributes(path);
             return (fa & FileAttributes.Directory) != 0;
+        }
+
+        private static async Task UploadFile(string path, string username, string password)
+        {
+            const string FtpRoot = "ftp://speedtest.tele2.net/upload";
+            await Task.Factory.StartNew(()=> 
+            {
+                using (WebClient wc = new WebClient())
+                {
+                    wc.Credentials = new NetworkCredential(username, password);
+                    wc.UploadFile($"{FtpRoot}/${Path.GetFileName(path)}", WebRequestMethods.Ftp.UploadFile, path);
+
+                    // Afterwards emit SendEmailEvent
+                    Console.WriteLine("File uploaded to FTP!");
+                }
+            });
         }
     }
 }
