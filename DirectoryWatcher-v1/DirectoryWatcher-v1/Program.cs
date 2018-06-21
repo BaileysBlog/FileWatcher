@@ -1,6 +1,8 @@
 ﻿using System;
 using System.IO;
 using System.Net;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -79,7 +81,7 @@ namespace DirectoryWatcher_v1
             //If file!
             if (!IsDirectory(e.FullPath))
             {
-                Console.WriteLine($"{GetExtensionlessName(e.FullPath)} has been {e.ChangeType.ToString().ToLower()}");
+                Console.WriteLine($"{MD5Hash(e.FullPath)}-{GetExtensionlessName(e.FullPath)} has been {e.ChangeType.ToString().ToLower()}");
                 await UploadFile(e.FullPath, "anonymous", "anonymous");
             }
             else
@@ -109,9 +111,21 @@ namespace DirectoryWatcher_v1
                     wc.UploadFile($"{FtpRoot}/${Path.GetFileName(path)}", WebRequestMethods.Ftp.UploadFile, path);
 
                     // Afterwards emit SendEmailEvent
-                    Console.WriteLine("File uploaded to FTP!");
+                    Console.WriteLine($"{MD5Hash(path)}-{GetExtensionlessName(path)} uploaded to FTP!");
                 }
             });
+        }
+
+        private static string MD5Hash(string path)
+        {
+            using (var md5 = MD5.Create())
+            {
+                using (var stream = File.OpenRead(path))
+                {
+                    var hash = md5.ComputeHash(stream);
+                    return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+                }
+            }
         }
     }
 }
