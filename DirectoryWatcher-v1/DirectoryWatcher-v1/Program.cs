@@ -60,11 +60,11 @@ namespace DirectoryWatcher_v1
         {
             if (!IsDirectory(e.FullPath))
             {
-                Console.WriteLine($"A file was renamed! {GetExtensionlessName(e.OldFullPath)} --> {GetExtensionlessName(e.FullPath)}");
+                Console.WriteLine($"{e.OldName} --> {e.Name}");
             }
             else
             {
-                Console.WriteLine($"A directory was renamed! {GetExtensionlessName(e.OldFullPath)} --> {GetExtensionlessName(e.FullPath)}");
+                Console.WriteLine($"{GetExtensionlessName(e.OldFullPath)} --> {GetExtensionlessName(e.FullPath)}");
             }
         }
 
