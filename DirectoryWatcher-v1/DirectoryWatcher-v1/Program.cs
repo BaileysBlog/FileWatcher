@@ -51,8 +51,26 @@ namespace DirectoryWatcher_v1
                          | NotifyFilters.FileName | NotifyFilters.DirectoryName
             };
             fw.Created += FileCreated;
+            fw.Renamed += FileRenamed;
             fw.EnableRaisingEvents = true;
             
+        }
+
+        private static void FileRenamed(object sender, RenamedEventArgs e)
+        {
+            if (!IsDirectory(e.FullPath))
+            {
+                Console.WriteLine($"A file was renamed! {GetExtensionlessName(e.OldFullPath)} --> {GetExtensionlessName(e.FullPath)}");
+            }
+            else
+            {
+                Console.WriteLine($"A directory was renamed! {GetExtensionlessName(e.OldFullPath)} --> {GetExtensionlessName(e.FullPath)}");
+            }
+        }
+
+        private static string GetExtensionlessName(string path)
+        {
+            return Path.GetFileNameWithoutExtension(path);
         }
 
         private static void FileCreated(object sender, FileSystemEventArgs e)
@@ -60,7 +78,7 @@ namespace DirectoryWatcher_v1
             //If file!
             if (!IsDirectory(e.FullPath))
             {
-                Console.WriteLine($"{Path.GetFileNameWithoutExtension(e.FullPath)} has been {e.ChangeType.ToString().ToLower()}");
+                Console.WriteLine($"{GetExtensionlessName(e.FullPath)} has been {e.ChangeType.ToString().ToLower()}");
             }
             else
             {
