@@ -1,4 +1,5 @@
-﻿using System;
+﻿using DirectoryWatcher;
+using System;
 using System.IO;
 using System.Net;
 using System.Security.Cryptography;
@@ -11,7 +12,19 @@ namespace DirectoryWatcher_v1
     class Program
     {
         static FileSystemWatcher fw;
-        static ManualResetEvent ExitHandler = new ManualResetEvent(false); 
+        static ManualResetEvent ExitHandler = new ManualResetEvent(false);
+
+        static readonly Settings Settings;
+
+        static Program()
+        {
+
+            //Load text
+            var text = File.ReadAllText("Settings.json");
+
+            // Try and read the Settings.json file
+            Settings = Newtonsoft.Json.JsonConvert.DeserializeObject<Settings>(text);
+        }
 
         static void Main(string[] args)
         {
@@ -40,9 +53,7 @@ namespace DirectoryWatcher_v1
 
         public static DirectoryInfo GetOrCreateWatcherDirectory()
         {
-            var Desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
-            var FolderName = "Watch ME";
-            return Directory.CreateDirectory(Path.Combine(Desktop, FolderName));
+            return new DirectoryInfo(Settings.GetWatcherPath());
         }
 
         public static void StartWatching(DirectoryInfo _dir)
@@ -50,8 +61,7 @@ namespace DirectoryWatcher_v1
             fw = new FileSystemWatcher(_dir.FullName)
             {
                 Filter = "*.*",
-                NotifyFilter = NotifyFilters.LastAccess | NotifyFilters.LastWrite
-                         | NotifyFilters.FileName | NotifyFilters.DirectoryName
+                NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.DirectoryName
             };
             fw.Created += FileCreated;
             fw.Renamed += FileRenamed;
@@ -81,6 +91,7 @@ namespace DirectoryWatcher_v1
             //If file!
             if (!IsDirectory(e.FullPath))
             {
+                await FileUnlocked(e.FullPath);
                 Console.WriteLine($"{MD5Hash(e.FullPath)}-{GetExtensionlessName(e.FullPath)} has been {e.ChangeType.ToString().ToLower()}");
                 await UploadFile(e.FullPath, "anonymous", "anonymous");
             }
@@ -88,10 +99,22 @@ namespace DirectoryWatcher_v1
             {
                 // Special logic for directories?
                 Console.WriteLine($"{Path.GetFileNameWithoutExtension(e.FullPath)} is a directory, and has also been {e.ChangeType.ToString().ToLower()}");
-            }
-            
+            }            
+        }
 
-            
+        private static Task FileUnlocked(string fullPath)
+        {
+            return Task.Factory.StartNew(()=> 
+            {
+
+                // If locked wait 1 second and try again
+                // Else kill thread
+
+                do
+                {
+                    Thread.Sleep((int)TimeSpan.FromSeconds(1).TotalMilliseconds);
+                } while (IsFileLocked(fullPath));
+            });
         }
 
         private static bool IsDirectory(string path)
@@ -112,6 +135,29 @@ namespace DirectoryWatcher_v1
 
                     // Afterwards emit SendEmailEvent
                     Console.WriteLine($"{MD5Hash(path)}-{GetExtensionlessName(path)} uploaded to FTP!");
+
+
+                    // Check if file needs deleted after upload
+                    if (Settings.DeleteFileAfterUpload)
+                    {
+                        TryDeleteFileAsync(path);
+                        Console.WriteLine($"{GetExtensionlessName(path)} has been deleted");
+                    }
+                }
+            });
+        }
+
+        public static Task TryDeleteFileAsync(String path)
+        {
+            return Task.Factory.StartNew(()=> 
+            {
+                try
+                {
+                    File.Delete(path);
+                }
+                catch (Exception)
+                {
+                    
                 }
             });
         }
@@ -120,12 +166,38 @@ namespace DirectoryWatcher_v1
         {
             using (var md5 = MD5.Create())
             {
-                using (var stream = File.OpenRead(path))
+                using (var stream = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
                 {
                     var hash = md5.ComputeHash(stream);
                     return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
                 }
             }
+        }
+
+        private static bool IsFileLocked(String path)
+        {
+            FileStream stream = null;
+
+            try
+            {
+                stream = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.None);
+            }
+            catch (IOException)
+            {
+                //the file is unavailable because it is:
+                //still being written to
+                //or being processed by another thread
+                //or does not exist (has already been processed)
+                return true;
+            }
+            finally
+            {
+                if (stream != null)
+                    stream.Close();
+            }
+
+            //file is not locked
+            return false;
         }
     }
 }
