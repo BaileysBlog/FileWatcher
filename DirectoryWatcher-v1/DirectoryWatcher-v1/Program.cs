@@ -16,7 +16,7 @@ namespace DirectoryWatcher_v1
         static void Main(string[] args)
         {
             
-            var watcherPath = CreateWatcherDirectory();
+            var watcherPath = GetOrCreateWatcherDirectory();
 
             Console.WriteLine($"Beginning to watch directory {watcherPath.FullName}");
             Console.WriteLine("Press Ctrl+C to exit!");
@@ -38,7 +38,7 @@ namespace DirectoryWatcher_v1
             ExitHandler.Set();
         }
 
-        public static DirectoryInfo CreateWatcherDirectory()
+        public static DirectoryInfo GetOrCreateWatcherDirectory()
         {
             var Desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
             var FolderName = "Watch ME";
